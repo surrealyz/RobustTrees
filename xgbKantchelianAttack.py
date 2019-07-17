@@ -10,7 +10,7 @@ import os
 import xgboost as xgb
 import time
 import argparse
-
+import pickle
 
 GUARD_VAL = 2e-7
 ROUND_DIGITS = 20
@@ -75,8 +75,8 @@ class node_wrapper(object):
 		self.leaves_lists = []	
 		self.add_leaves(treeid, nodeid, left_leaves,right_leaves,root)
 
-	def print(self):
-		print('node_pos{}, attr:{}, th:{}, leaves:{}'.format(self.node_pos, self.attribute, self.threshold, self.leaves_lists))
+	#def print(self):
+	#	print('node_pos{}, attr:{}, th:{}, leaves:{}'.format(self.node_pos, self.attribute, self.threshold, self.leaves_lists))
 
 	def add_leaves(self, treeid,  nodeid, left_leaves, right_leaves, root=False):
 		self.node_pos.append({'treeid':treeid, 'nodeid':nodeid})
@@ -283,7 +283,7 @@ class xgbKantchelianAttack(object):
 		if (not self.binary) or label == 1:
 			self.m.addConstr(LinExpr(self.leaf_v_list,self.llist)<=0, name='mislabel')
 		else:
-			self.m.addConstr(LinExpr(self.leaf_v_list,self.llist)>=self.guard_val, name='mislabel')
+			self.m.addConstr(LinExpr(self.leaf_v_list,self.llist)<=self.guard_val, name='mislabel')
 		self.m.update()	
 
 		if self.order == np.inf:
@@ -338,6 +338,7 @@ class xgbKantchelianAttack(object):
 		for v in self.m.getVars():
 			print('%s %g' % (v.varName, v.x))
 
+                # TODO: why change k[key] based on node[0] and guard_val?
 		print('Obj: %g' % self.m.objVal)
 		for key in self.pdict.keys():
 			for node in self.pdict[key]:
@@ -480,19 +481,33 @@ def main(args):
 	else:
 		attack = xgbMultiClassKantchelianAttack(model, num_classes=args['num_classes'], guard_val=args['guard_val'], round_digits=args['round_digits'])
 	
-	test_data, test_labels = load_svmlight_file(args['data'])
-	test_data = test_data.toarray()
+	#test_data, test_labels = load_svmlight_file(args['data'])
+	#test_data = test_data.toarray()
+        
+        # load test_data from pickle.
+        #feat_dict = pickle.load(open('/home/yz/code/robustml/robustness_spec/seeds_500/feat_dict.pickle', 'rb'))
+        feat_dict = pickle.load(open(args['data'], 'rb'))
+        # test one sample
+        #test_data = np.array([feat_dict['2062318f6841e0a18d997fb4e88581ca3771a6c2']])
+        #test_labels = np.ones(1)
+        #print(test_data)
+        #print('*** before attack,', test_data[0][1149])
+        test_data = np.array([list(item[1]) for item in feat_dict.items()])
+        file_hashes = [item[0] for item in feat_dict.items()]
+        test_labels = np.ones(len(test_data))
+
 	if args['feature_start'] > 0:
 		test_data = np.hstack((np.zeros((len(test_data),args['feature_start'])),test_data))
 	test_labels = test_labels[:,np.newaxis].astype(int)
 	
 	arr = np.arange(len(test_data))
-	np.random.shuffle(arr)
+	#np.random.shuffle(arr)
 	samples = arr[args['offset']:args['offset']+args['num_attacks']]
 	num_attacks = len(samples) # real number of attacks cannot be larger than test data size
 	avg_dist = 0
 	counter = 0
 	global_start = time.time()
+        fout = open(args['out'], 'w')
 	for n,idx in enumerate(samples):
 		print("\n\n\n\n======== Point {} ({}/{}) starts =========".format(idx, n+1, num_attacks))
 		predict = model.predict(test_data[idx])
@@ -503,15 +518,18 @@ def main(args):
 			print('prediction not correct, skip this one.')
 			continue
 		adv = attack.attack(test_data[idx], test_labels[idx])
-		dist = np.max(np.abs(adv-test_data[idx]))
+                #print('*** after attack,', adv[1149])
+		#dist = np.max(np.abs(adv-test_data[idx]))
+		dist = np.sum(np.abs(adv-test_data[idx]))
 		print('adv[0]:', adv[0])
 		if args['feature_start']>0:
 			adv[0] = 0
 			print('0th feature set back to 0. adv[0]:', adv[0])
 		avg_dist += dist
 		print("\n======== Point {} ({}/{}) finished, distortion:{} =========".format(idx, n+1, num_attacks, dist))
+                fout.write('%s %s\n' % (file_hashes[idx], int(dist)))
 	print('\n\nattacked {}/{} points, average linf distortion: {}, total time:{}'.format(counter, num_attacks, avg_dist/counter, time.time()-global_start))
-
+        fout.close()
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
@@ -519,9 +537,10 @@ if __name__ == '__main__':
 	parser.add_argument('-m', '--model', help='model path')
 	parser.add_argument('-c', '--num_classes', type=int, help='number of classes')
 	parser.add_argument('-o', '--offset', type=int, default=0, help='start index of attack')
-	parser.add_argument('-n', '--num_attacks', type=int, default=100, help='number of points to be attacked')
+	parser.add_argument('-n', '--num_attacks', type=int, default=500, help='number of points to be attacked')
 	parser.add_argument('-g', '--guard_val', type=float, default=GUARD_VAL, help='guard value')
 	parser.add_argument('-r', '--round_digits', type=int, default=ROUND_DIGITS, help='number of digits to round')
+	parser.add_argument('--out', help='output csv file name')
 	parser.add_argument('--feature_start', type=int, default=1, choices=[0,1], help='feature number starts from which index? For cod-rna and higgs, this should be 0.')
 	args = vars(parser.parse_args())
 	print(args)
