@@ -484,6 +484,19 @@ def main(args):
 	#test_data, test_labels = load_svmlight_file(args['data'])
 	#test_data = test_data.toarray()
         
+        # load idx_to_path
+        idx_to_path = {}
+        with open('/home/yz/code/robustml/robustness_spec/features.nppf', 'r') as fin:
+            header = True
+            idx = 0
+            for line in fin:
+                if header is True:
+                    header = False
+                    continue
+                key = line.rstrip().replace('\x00', '/').rstrip('/')
+                idx_to_path[idx] = key
+                idx += 1
+
         # load test_data from pickle.
         #feat_dict = pickle.load(open('/home/yz/code/robustml/robustness_spec/seeds_500/feat_dict.pickle', 'rb'))
         feat_dict = pickle.load(open(args['data'], 'rb'))
@@ -492,9 +505,11 @@ def main(args):
         #test_labels = np.ones(1)
         #print(test_data)
         #print('*** before attack,', test_data[0][1149])
-        test_data = np.array([list(item[1]) for item in feat_dict.items()])
+        #test_data = np.array([list(item[1]) for item in feat_dict.items()])
+        test_data = np.array([item[1].toarray()[0] for item in feat_dict.items()])
         file_hashes = [item[0] for item in feat_dict.items()]
         test_labels = np.ones(len(test_data))
+        sha1_adv = {}
 
 	if args['feature_start'] > 0:
 		test_data = np.hstack((np.zeros((len(test_data),args['feature_start'])),test_data))
@@ -518,17 +533,32 @@ def main(args):
 			print('prediction not correct, skip this one.')
 			continue
 		adv = attack.attack(test_data[idx], test_labels[idx])
+                ### save the adv example for that sha1
+                sha1_adv[file_hashes[idx]] = adv
                 #print('*** after attack,', adv[1149])
 		#dist = np.max(np.abs(adv-test_data[idx]))
+                diff = adv-test_data[idx]
+                noabsdist = np.sum(adv-test_data[idx])
 		dist = np.sum(np.abs(adv-test_data[idx]))
 		print('adv[0]:', adv[0])
 		if args['feature_start']>0:
 			adv[0] = 0
 			print('0th feature set back to 0. adv[0]:', adv[0])
 		avg_dist += dist
-		print("\n======== Point {} ({}/{}) finished, distortion:{} =========".format(idx, n+1, num_attacks, dist))
-                fout.write('%s %s\n' % (file_hashes[idx], int(dist)))
+                print("\n======== Point {} ({}/{}) finished, distortion:{}, noabsdist:{} =========".format(idx, n+1, num_attacks, dist, noabsdist))
+                # also record manipulated PDF paths.
+                # get the negatives in diff
+                # get the positives in diff
+                deleted = []
+                inserted = []
+                for k in range(len(diff)):
+                    if diff[k] < 0:
+                        deleted.append(idx_to_path[k])
+                    if diff[k] > 0:
+                        inserted.append(idx_to_path[k])
+                fout.write('%s\t%s\t%s\t%s\n' % (file_hashes[idx], int(dist), ','.join(deleted), ','.join(inserted)))
 	print('\n\nattacked {}/{} points, average linf distortion: {}, total time:{}'.format(counter, num_attacks, avg_dist/counter, time.time()-global_start))
+        pickle.dump(sha1_adv, open(args['adv'], 'wb'))
         fout.close()
 
 if __name__ == '__main__':
@@ -537,10 +567,11 @@ if __name__ == '__main__':
 	parser.add_argument('-m', '--model', help='model path')
 	parser.add_argument('-c', '--num_classes', type=int, help='number of classes')
 	parser.add_argument('-o', '--offset', type=int, default=0, help='start index of attack')
-	parser.add_argument('-n', '--num_attacks', type=int, default=500, help='number of points to be attacked')
+	parser.add_argument('-n', '--num_attacks', type=int, default=3416, help='number of points to be attacked')
 	parser.add_argument('-g', '--guard_val', type=float, default=GUARD_VAL, help='guard value')
 	parser.add_argument('-r', '--round_digits', type=int, default=ROUND_DIGITS, help='number of digits to round')
 	parser.add_argument('--out', help='output csv file name')
+	parser.add_argument('--adv', help='sha1 to adv example file pickle')
 	parser.add_argument('--feature_start', type=int, default=1, choices=[0,1], help='feature number starts from which index? For cod-rna and higgs, this should be 0.')
 	args = vars(parser.parse_args())
 	print(args)
