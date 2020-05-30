@@ -27,6 +27,13 @@ else
         not_ready=1
     fi
 
+    if [[ ! -e ./json/Makefile ]]; then
+        echo ""
+        echo "Please init the json submodule:"
+        echo "git submodule update --init --recursive -- json"
+        not_ready=1
+    fi
+
     if [[ "${not_ready}" == "1" ]]; then
         echo ""
         echo "Please fix the errors above and retry the build, or reclone the repository with:"

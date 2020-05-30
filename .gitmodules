@@ -7,3 +7,7 @@
 [submodule "cub"]
 	path = cub
 	url = https://github.com/NVlabs/cub.git
+[submodule "json"]
+	path = json
+	url = https://github.com/nlohmann/json.git
+	branch = master

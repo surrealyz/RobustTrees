@@ -116,7 +116,8 @@ struct LearnerTrainParam : public dmlc::Parameter<LearnerTrainParam> {
         .add_enum("hist", 3)
         .add_enum("gpu_exact", 4)
         .add_enum("gpu_hist", 5)
-        .add_enum("robust_exact", 6) 
+        .add_enum("robust_exact", 6)
+        .add_enum("robust_centergreedy", 7)
         .describe("Choice of tree construction method.");
     DMLC_DECLARE_FIELD(test_flag).set_default("").describe(
         "Internal test flag");
@@ -190,7 +191,11 @@ class LearnerImpl : public Learner {
       if (cfg_.count("updater") == 0) {
         cfg_["updater"] = "robust_grow_colmaker,prune";
       }
-    } 
+    } else if (tparam_.tree_method == 7) {
+      if (cfg_.count("updater") == 0) {
+        cfg_["updater"] = "centergreedy_grow_colmaker,prune";
+      }
+    }
   }
 
   void Configure(

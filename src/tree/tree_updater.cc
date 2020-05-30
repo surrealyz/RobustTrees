@@ -29,6 +29,7 @@ namespace tree {
 // List of files that will be force linked in static links.
 DMLC_REGISTRY_LINK_TAG(updater_colmaker);
 DMLC_REGISTRY_LINK_TAG(updater_robust_colmaker);
+DMLC_REGISTRY_LINK_TAG(updater_centergreedy_colmaker);
 DMLC_REGISTRY_LINK_TAG(updater_skmaker);
 DMLC_REGISTRY_LINK_TAG(updater_refresh);
 DMLC_REGISTRY_LINK_TAG(updater_prune);
