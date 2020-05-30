@@ -805,14 +805,8 @@ class CenterGreedyColMaker: public TreeUpdater {
                   spliteval_->ComputeSplitScore(nid, fid, e.stats, c) -
                   snode_[nid].root_gain);
             }
-
-            int greedy_best = 0;
-            int greedy_better = 0;
             if (loss_chg == 0.0) {
               continue;
-            }
-            if (loss_chg < 0.0) {
-              greedy_best = -1.0;
             }
             if (param_.robust_training_verbose) printf("\ninitial loss change is %4.5f\n",loss_chg);
 
