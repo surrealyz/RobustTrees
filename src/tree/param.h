@@ -14,7 +14,9 @@
 #include <limits>
 #include <string>
 #include <vector>
+#include <nlohmann/json.hpp>
 
+using json = nlohmann::json;
 
 namespace xgboost {
 namespace tree {
@@ -41,7 +43,9 @@ struct TrainParam : public dmlc::Parameter<TrainParam> {
   float min_child_weight;
   // robust training eps for maximizing split loss
   float robust_eps;
-  // verbose parameter for fobust training
+  /*! \brief the path of training set */
+  std::string eps_json;
+  // verbose parameter for robust training
   bool robust_training_verbose; 
   // random sample split at each node
   float splitsample_bynode; 
@@ -126,8 +130,10 @@ struct TrainParam : public dmlc::Parameter<TrainParam> {
         .describe("Minimum sum of instance weight(hessian) needed in a child.");
     DMLC_DECLARE_FIELD(robust_eps)
         .set_lower_bound(0.0f)
-        .set_default(0.3f)
+        .set_default(0.0f)
         .describe("When robust training is used, define the epsilon range to maximize split loss");
+    DMLC_DECLARE_FIELD(eps_json).set_default("NULL")
+        .describe("Json file containing lower and upper epsilon for each feature dimension, if any.");
     DMLC_DECLARE_FIELD(robust_training_verbose)
         .set_default(false)
         .describe("print information for robust training debugging");
